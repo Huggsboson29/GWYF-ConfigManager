@@ -36,7 +36,7 @@ jobs:
       - self-hosted
       - Windows
     env:
-      DOTNET_INSTALL_DIR: ${{ runner.temp }}/dotnet
+      DOTNET_INSTALL_DIR: ${{ github.workspace }}/.dotnet
     outputs:
       artifact_name: ${{ steps.package.outputs.artifact_name }}
       package_version: ${{ steps.package.outputs.package_version }}
@@ -128,7 +128,7 @@ jobs:
       - self-hosted
       - Windows
     env:
-      DOTNET_INSTALL_DIR: ${{ runner.temp }}/dotnet
+      DOTNET_INSTALL_DIR: ${{ github.workspace }}/.dotnet
       THUNDERSTORE_NAMESPACE: ${{ secrets.THUNDERSTORE_NAMESPACE }}
       TCLI_AUTH_TOKEN: ${{ secrets.TCLI_AUTH_TOKEN }}
     steps:
