@@ -5,7 +5,7 @@
 1. Run `scripts\Deploy-ToGame.ps1`.
 2. Launch the game as host.
 3. Confirm `BepInEx\LogOutput.log` contains the plugin startup line and applied timing output.
-4. Confirm `BepInEx\config\com.dylan.gwyf.timeconfig.cfg` is created and your changes affect a fresh hosted run.
+4. Confirm `BepInEx\config\com.lncinteractive.cfg` is created and your changes affect a fresh hosted run.
 5. If multiplayer behavior matters, join from a second client and confirm the host-selected settings are visible and read-only.
 
 ## Release prerequisites

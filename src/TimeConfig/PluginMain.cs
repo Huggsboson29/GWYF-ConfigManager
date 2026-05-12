@@ -10,7 +10,7 @@ namespace TimeConfig;
 [BepInPlugin(PluginGuid, PluginName, PluginVersion)]
 public sealed class PluginMain : BaseUnityPlugin
 {
-    public const string PluginGuid = "com.dylan.gwyf.timeconfig";
+    public const string PluginGuid = "com.lncinteractive";
     public const string PluginName = "TimeConfig";
     public const string PluginVersion = "0.1.0";
 

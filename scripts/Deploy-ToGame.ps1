@@ -15,7 +15,8 @@ $fetchScript = Join-Path $repoRoot 'scripts\Fetch-DevDependencies.ps1'
 $bepInExExtract = Join-Path $repoRoot '.local\BepInEx\extract'
 $gameManagedDir = Join-Path $GameRoot 'Gamble With Your Friends_Data\Managed'
 $gameBepInExCoreDir = Join-Path $GameRoot 'BepInEx\core'
-$pluginDir = Join-Path $GameRoot 'BepInEx\plugins\com.dylan.gwyf.timeconfig'
+$legacyPluginDir = Join-Path $GameRoot 'BepInEx\plugins\com.dylan.gwyf.timeconfig'
+$pluginDir = Join-Path $GameRoot 'BepInEx\plugins\com.lncinteractive'
 $outputDir = Join-Path $repoRoot "src\TimeConfig\bin\$Configuration\netstandard2.1"
 
 if (-not (Test-Path $GameRoot)) {
@@ -41,6 +42,10 @@ if (-not (Test-Path (Join-Path $outputDir 'TimeConfig.dll'))) {
     throw "Expected build output was not found under: $outputDir"
 }
 
+if ((Test-Path $legacyPluginDir) -and ($legacyPluginDir -ne $pluginDir)) {
+    Remove-Item -LiteralPath $legacyPluginDir -Recurse -Force
+}
+
 New-Item -ItemType Directory -Path $pluginDir -Force | Out-Null
 
 Copy-Item -LiteralPath (Join-Path $outputDir 'TimeConfig.dll') -Destination $pluginDir -Force
@@ -51,4 +56,4 @@ if (Test-Path $pdbPath) {
 }
 
 Write-Host "TimeConfig deployed to: $pluginDir"
-Write-Host "Expected config path after first launch: $(Join-Path $GameRoot 'BepInEx\config\com.dylan.gwyf.timeconfig.cfg')"
+Write-Host "Expected config path after first launch: $(Join-Path $GameRoot 'BepInEx\config\com.lncinteractive.cfg')"
