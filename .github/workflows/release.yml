@@ -35,6 +35,8 @@ jobs:
     runs-on:
       - self-hosted
       - Windows
+    env:
+      DOTNET_INSTALL_DIR: ${{ runner.temp }}/dotnet
     outputs:
       artifact_name: ${{ steps.package.outputs.artifact_name }}
       package_version: ${{ steps.package.outputs.package_version }}
@@ -71,9 +73,11 @@ jobs:
         id: package
         shell: pwsh
         run: |
-          $arguments = @('-GameRoot', '${{ steps.game-root.outputs.game_root }}')
+          $arguments = @{
+            GameRoot = '${{ steps.game-root.outputs.game_root }}'
+          }
           if ('${{ inputs.skip_tests }}' -eq 'true') {
-              $arguments += '-SkipTests'
+            $arguments.SkipTests = $true
           }
 
           .\scripts\Pack-Thunderstore.ps1 @arguments
@@ -124,6 +128,7 @@ jobs:
       - self-hosted
       - Windows
     env:
+      DOTNET_INSTALL_DIR: ${{ runner.temp }}/dotnet
       THUNDERSTORE_NAMESPACE: ${{ secrets.THUNDERSTORE_NAMESPACE }}
       TCLI_AUTH_TOKEN: ${{ secrets.TCLI_AUTH_TOKEN }}
     steps:
@@ -161,13 +166,13 @@ jobs:
               throw 'Missing repository secret TCLI_AUTH_TOKEN.'
           }
 
-          $arguments = @(
-              '-Namespace', $env:THUNDERSTORE_NAMESPACE,
-              '-GameRoot', '${{ steps.game-root.outputs.game_root }}',
-              '-InstallTcli'
-          )
+            $arguments = @{
+              Namespace = $env:THUNDERSTORE_NAMESPACE
+              GameRoot = '${{ steps.game-root.outputs.game_root }}'
+              InstallTcli = $true
+            }
           if ('${{ inputs.skip_tests }}' -eq 'true') {
-              $arguments += '-SkipTests'
+              $arguments.SkipTests = $true
           }
 
           .\scripts\Publish-Thunderstore.ps1 @arguments
