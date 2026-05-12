@@ -1,0 +1,11 @@
+/.local/
+/artifacts/
+**/bin/
+**/obj/
+.vs/
+.vscode/
+.specify/
+.github/agents/
+.github/prompts/
+.github/copilot-instructions.md
+

@@ -1,0 +1,54 @@
+#!/usr/bin/env pwsh
+
+[CmdletBinding()]
+param(
+    [string]$GameRoot = 'C:\Program Files (x86)\Steam\steamapps\common\Gamble With Your Friends',
+    [ValidateSet('Debug', 'Release')]
+    [string]$Configuration = 'Debug'
+)
+
+$ErrorActionPreference = 'Stop'
+
+$repoRoot = Split-Path $PSScriptRoot -Parent
+$projectFile = Join-Path $repoRoot 'src\TimeConfig\TimeConfig.csproj'
+$fetchScript = Join-Path $repoRoot 'scripts\Fetch-DevDependencies.ps1'
+$bepInExExtract = Join-Path $repoRoot '.local\BepInEx\extract'
+$gameManagedDir = Join-Path $GameRoot 'Gamble With Your Friends_Data\Managed'
+$gameBepInExCoreDir = Join-Path $GameRoot 'BepInEx\core'
+$pluginDir = Join-Path $GameRoot 'BepInEx\plugins\com.dylan.gwyf.timeconfig'
+$outputDir = Join-Path $repoRoot "src\TimeConfig\bin\$Configuration\netstandard2.1"
+
+if (-not (Test-Path $GameRoot)) {
+    throw "Game root was not found: $GameRoot"
+}
+
+if (-not (Test-Path (Join-Path $gameManagedDir 'Assembly-CSharp.dll'))) {
+    throw "Game managed assemblies were not found under: $gameManagedDir"
+}
+
+if (-not (Test-Path (Join-Path $bepInExExtract 'BepInEx\core\BepInEx.dll'))) {
+    & $fetchScript
+}
+
+if (-not (Test-Path (Join-Path $gameBepInExCoreDir 'BepInEx.dll'))) {
+    Get-ChildItem -LiteralPath $bepInExExtract -Force |
+        Copy-Item -Destination $GameRoot -Recurse -Force
+}
+
+& dotnet build $projectFile -c $Configuration "/p:GameManagedDir=$gameManagedDir"
+
+if (-not (Test-Path (Join-Path $outputDir 'TimeConfig.dll'))) {
+    throw "Expected build output was not found under: $outputDir"
+}
+
+New-Item -ItemType Directory -Path $pluginDir -Force | Out-Null
+
+Copy-Item -LiteralPath (Join-Path $outputDir 'TimeConfig.dll') -Destination $pluginDir -Force
+
+$pdbPath = Join-Path $outputDir 'TimeConfig.pdb'
+if (Test-Path $pdbPath) {
+    Copy-Item -LiteralPath $pdbPath -Destination $pluginDir -Force
+}
+
+Write-Host "TimeConfig deployed to: $pluginDir"
+Write-Host "Expected config path after first launch: $(Join-Path $GameRoot 'BepInEx\config\com.dylan.gwyf.timeconfig.cfg')"

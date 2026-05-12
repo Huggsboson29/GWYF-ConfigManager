@@ -1,0 +1,173 @@
+name: Release Mod
+
+on:
+  workflow_dispatch:
+    inputs:
+      game_root:
+        description: Installed Gamble With Your Friends root on the self-hosted runner
+        required: false
+        type: string
+      skip_tests:
+        description: Skip the test project during packaging and publish
+        required: false
+        default: false
+        type: boolean
+      publish_to_thunderstore:
+        description: Publish the built package to Thunderstore after packaging succeeds
+        required: false
+        default: false
+        type: boolean
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+env:
+  DEFAULT_GAME_ROOT: C:\Program Files (x86)\Steam\steamapps\common\Gamble With Your Friends
+  DOTNET_CLI_TELEMETRY_OPTOUT: '1'
+  DOTNET_NOLOGO: '1'
+
+jobs:
+  package:
+    name: Package Thunderstore Zip
+    runs-on:
+      - self-hosted
+      - Windows
+    outputs:
+      artifact_name: ${{ steps.package.outputs.artifact_name }}
+      package_version: ${{ steps.package.outputs.package_version }}
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 9.0.x
+
+      - name: Resolve game root
+        id: game-root
+        shell: pwsh
+        run: |
+          $gameRoot = '${{ inputs.game_root }}'
+          if ([string]::IsNullOrWhiteSpace($gameRoot)) {
+              $gameRoot = '${{ vars.GWYF_GAME_ROOT }}'
+          }
+          if ([string]::IsNullOrWhiteSpace($gameRoot)) {
+              $gameRoot = $env:DEFAULT_GAME_ROOT
+          }
+          if (-not (Test-Path $gameRoot)) {
+              throw "Game root was not found on the runner: $gameRoot"
+          }
+          "game_root=$gameRoot" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
+
+      - name: Fetch BepInEx dependencies
+        shell: pwsh
+        run: .\scripts\Fetch-DevDependencies.ps1
+
+      - name: Build and pack Thunderstore zip
+        id: package
+        shell: pwsh
+        run: |
+          $arguments = @('-GameRoot', '${{ steps.game-root.outputs.game_root }}')
+          if ('${{ inputs.skip_tests }}' -eq 'true') {
+              $arguments += '-SkipTests'
+          }
+
+          .\scripts\Pack-Thunderstore.ps1 @arguments
+
+          $manifest = Get-Content -LiteralPath .\src\TimeConfig\Packaging\manifest.json -Raw | ConvertFrom-Json
+          $zipPath = Join-Path $PWD ('artifacts\thunderstore\{0}-{1}.zip' -f $manifest.name, $manifest.version_number)
+          if (-not (Test-Path $zipPath)) {
+              throw "Expected package zip was not produced: $zipPath"
+          }
+
+          $artifactName = 'thunderstore-package-v{0}' -f $manifest.version_number
+          "artifact_name=$artifactName" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
+          "package_version=$($manifest.version_number)" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
+
+      - name: Upload packaged zip
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ steps.package.outputs.artifact_name }}
+          path: artifacts/thunderstore/*.zip
+          if-no-files-found: error
+
+  github-release:
+    name: Attach Zip To GitHub Release
+    needs: package
+    if: startsWith(github.ref, 'refs/tags/')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download packaged zip
+        uses: actions/download-artifact@v4
+        with:
+          name: ${{ needs.package.outputs.artifact_name }}
+          path: release-assets
+
+      - name: Publish GitHub release assets
+        uses: softprops/action-gh-release@v2
+        with:
+          files: release-assets/*
+          fail_on_unmatched_files: true
+          generate_release_notes: true
+
+  publish-thunderstore:
+    name: Publish To Thunderstore
+    needs: package
+    if: |
+      (github.event_name == 'workflow_dispatch' && inputs.publish_to_thunderstore) ||
+      (startsWith(github.ref, 'refs/tags/') && vars.THUNDERSTORE_AUTO_PUBLISH == 'true')
+    runs-on:
+      - self-hosted
+      - Windows
+    env:
+      THUNDERSTORE_NAMESPACE: ${{ secrets.THUNDERSTORE_NAMESPACE }}
+      TCLI_AUTH_TOKEN: ${{ secrets.TCLI_AUTH_TOKEN }}
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 9.0.x
+
+      - name: Resolve game root
+        id: game-root
+        shell: pwsh
+        run: |
+          $gameRoot = '${{ inputs.game_root }}'
+          if ([string]::IsNullOrWhiteSpace($gameRoot)) {
+              $gameRoot = '${{ vars.GWYF_GAME_ROOT }}'
+          }
+          if ([string]::IsNullOrWhiteSpace($gameRoot)) {
+              $gameRoot = $env:DEFAULT_GAME_ROOT
+          }
+          if (-not (Test-Path $gameRoot)) {
+              throw "Game root was not found on the runner: $gameRoot"
+          }
+          "game_root=$gameRoot" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
+
+      - name: Publish package to Thunderstore
+        shell: pwsh
+        run: |
+          if ([string]::IsNullOrWhiteSpace($env:THUNDERSTORE_NAMESPACE)) {
+              throw 'Missing repository secret THUNDERSTORE_NAMESPACE.'
+          }
+          if ([string]::IsNullOrWhiteSpace($env:TCLI_AUTH_TOKEN)) {
+              throw 'Missing repository secret TCLI_AUTH_TOKEN.'
+          }
+
+          $arguments = @(
+              '-Namespace', $env:THUNDERSTORE_NAMESPACE,
+              '-GameRoot', '${{ steps.game-root.outputs.game_root }}',
+              '-InstallTcli'
+          )
+          if ('${{ inputs.skip_tests }}' -eq 'true') {
+              $arguments += '-SkipTests'
+          }
+
+          .\scripts\Publish-Thunderstore.ps1 @arguments
