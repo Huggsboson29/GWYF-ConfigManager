@@ -141,16 +141,34 @@ if ([string]::IsNullOrWhiteSpace($Token)) {
 }
 
 $tcliCommand = Get-Command tcli -ErrorAction SilentlyContinue
+$tcliPath = $tcliCommand?.Source
 if ($null -eq $tcliCommand) {
     if (-not $InstallTcli) {
         throw "tcli was not found. Install it with 'dotnet tool install -g tcli' or rerun this script with -InstallTcli."
     }
 
-    & dotnet tool install -g tcli
-    $tcliCommand = Get-Command tcli -ErrorAction SilentlyContinue
-    if ($null -eq $tcliCommand) {
-        throw "tcli installation did not make the command available in the current shell. Open a new terminal and rerun the publish script."
+    $tcliToolPath = Join-Path $generatedConfigDirectory '.tools\tcli'
+    $tcliExecutable = Join-Path $tcliToolPath 'tcli.exe'
+    $tcliFallbackExecutable = Join-Path $tcliToolPath 'tcli'
+
+    New-Item -ItemType Directory -Path $tcliToolPath -Force | Out-Null
+
+    if (Test-Path $tcliExecutable -or Test-Path $tcliFallbackExecutable) {
+        & dotnet tool update tcli --tool-path $tcliToolPath
+    }
+    else {
+        & dotnet tool install tcli --tool-path $tcliToolPath
+    }
+
+    if (Test-Path $tcliExecutable) {
+        $tcliPath = $tcliExecutable
+    }
+    elseif (Test-Path $tcliFallbackExecutable) {
+        $tcliPath = $tcliFallbackExecutable
+    }
+    else {
+        throw "tcli installation did not produce an executable under: $tcliToolPath"
     }
 }
 
-& $tcliCommand.Source publish --config-path $configPath --file $zipPath --token $Token
+& $tcliPath publish --config-path $configPath --file $zipPath --token $Token
