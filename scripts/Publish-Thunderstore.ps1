@@ -153,7 +153,7 @@ if ($null -eq $tcliCommand) {
 
     New-Item -ItemType Directory -Path $tcliToolPath -Force | Out-Null
 
-    if (Test-Path $tcliExecutable -or Test-Path $tcliFallbackExecutable) {
+        if ((Test-Path $tcliExecutable) -or (Test-Path $tcliFallbackExecutable)) {
         & dotnet tool update tcli --tool-path $tcliToolPath
     }
     else {
