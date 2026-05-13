@@ -3,7 +3,7 @@
 ## 0.2.0
 
 - Add host-side quota scaling controls with vanilla or custom-pattern growth modes
-- Split TimeConfig's settings UI into separate Time and Quota sections
+- Split ConfigManager's settings UI into separate Time and Quota sections
 - Fix quota edits so they no longer reset the active run's quota state during setup
 - Remove multi-day quota overrides after inconsistent runtime behavior in testing
 

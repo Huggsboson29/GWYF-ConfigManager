@@ -1,6 +1,6 @@
-# TimeConfig
+# ConfigManager
 
-TimeConfig is a BepInEx plugin for *Gamble With Your Friends* that lets the host override
+ConfigManager is a BepInEx plugin for *Gamble With Your Friends* that lets the host override
 core time-pressure settings for new sessions.
 
 ## Current scope

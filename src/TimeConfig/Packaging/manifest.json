@@ -1,5 +1,5 @@
 {
-  "name": "TimeConfig",
+  "name": "ConfigManager",
   "version_number": "0.2.0",
   "website_url": "https://github.com/Huggsboson29/GWYF-ConfigManager",
   "description": "Host-authoritative day length and quota scaling configuration for Gamble With Your Friends.",

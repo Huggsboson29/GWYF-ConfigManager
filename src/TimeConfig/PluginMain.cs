@@ -11,7 +11,7 @@ namespace TimeConfig;
 public sealed class PluginMain : BaseUnityPlugin
 {
     public const string PluginGuid = "com.lncinteractive";
-    public const string PluginName = "TimeConfig";
+    public const string PluginName = "ConfigManager";
     public const string PluginVersion = "0.2.0";
 
     internal static ManualLogSource Log { get; private set; } = null!;

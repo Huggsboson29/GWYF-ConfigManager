@@ -66,7 +66,7 @@ public static class NativeLobbySettingsMenu
         tab.entries ??= new List<SettingItemBase>();
 
         var addedEntries = 0;
-        addedEntries += EnsureTitleEntry(tab.entries, SectionKey, "TimeConfig");
+        addedEntries += EnsureTitleEntry(tab.entries, SectionKey, "ConfigManager");
         addedEntries += EnsureTitleEntry(tab.entries, TimeSectionKey, "Time");
         addedEntries += EnsureSliderEntry(
             tab.entries,
