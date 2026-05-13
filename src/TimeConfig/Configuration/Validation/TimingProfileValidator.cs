@@ -8,7 +8,7 @@ namespace TimeConfig.Configuration;
 public static class TimingProfileValidator
 {
     public const float MinDayDurationSeconds = 10f;
-    public const float MaxDayDurationSeconds = 3600f;
+    public const float MaxDayDurationSeconds = 86400f;
     public const int MinDaysBeforeQuota = 1;
     public const int MaxDaysBeforeQuota = 30;
     public const long MaxQuotaValue = 1_000_000_000_000_000_000L;

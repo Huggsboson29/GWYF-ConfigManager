@@ -1,6 +1,7 @@
 using HarmonyLib;
 using Mirror;
 using TimeConfig.Network;
+using TimeConfig.Runtime;
 
 namespace TimeConfig.Patches;
 
@@ -26,5 +27,14 @@ internal static class LobbyPatches
     private static void ServerOnClientScenePlayReady_Postfix(NetworkConnectionToClient conn)
     {
         LobbyVisibility.SendToClient(conn);
+    }
+
+    [HarmonyPostfix, HarmonyPatch("RpcSetInLobbyPresence")]
+    private static void RpcSetInLobbyPresence_Postfix(GameManager __instance)
+    {
+        if (__instance == null || !NetworkServer.active) return;
+
+        TimingCoordinator.TryApplyToGameManagerRuntime(__instance, "GameManager.RpcSetInLobbyPresence");
+        LobbyVisibility.BroadcastCurrentState();
     }
 }

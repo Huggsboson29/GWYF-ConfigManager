@@ -31,10 +31,8 @@ if (-not (Test-Path (Join-Path $bepInExExtract 'BepInEx\core\BepInEx.dll'))) {
     & $fetchScript
 }
 
-if (-not (Test-Path (Join-Path $gameBepInExCoreDir 'BepInEx.dll'))) {
-    Get-ChildItem -LiteralPath $bepInExExtract -Force |
-        Copy-Item -Destination $GameRoot -Recurse -Force
-}
+Get-ChildItem -LiteralPath $bepInExExtract -Force |
+    Copy-Item -Destination $GameRoot -Recurse -Force
 
 & dotnet build $projectFile -c $Configuration "/p:GameManagedDir=$gameManagedDir"
 

@@ -19,9 +19,14 @@ internal static class DayTimerPatches
         if (gameSettings == null) return;
 
         // Only the host/server applies overrides.
-        if (!NetworkServer.active) return;
+        if (!NetworkServer.active)
+        {
+            LobbyVisibility.ClearClientState();
+            return;
+        }
 
         TimingCoordinator.TryApplyToGameSettings(gameSettings, "GameManager.OnAwake");
+        TimingCoordinator.TryApplyToGameManagerRuntime(__instance, "GameManager.OnAwake");
 
         // Inform connected clients of the applied timing profile.
         LobbyVisibility.BroadcastCurrentState();

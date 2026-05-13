@@ -9,6 +9,7 @@ namespace TimeConfig.Configuration;
 
 public sealed class ActiveSettings
 {
+    private readonly ConfigFile _config;
     public const float PreserveFloat = -1f;
     public const int PreserveInt = -1;
     public const long PreserveLong = -1L;
@@ -23,6 +24,7 @@ public sealed class ActiveSettings
     private readonly ProfileStore _profileStore;
 
     private ActiveSettings(
+        ConfigFile config,
         ConfigEntry<bool> enableCustomTiming,
         ConfigEntry<float> dayDurationSeconds,
         ConfigEntry<int> daysBeforeQuota,
@@ -32,6 +34,7 @@ public sealed class ActiveSettings
         ConfigEntry<string> activeProfileName,
         ProfileStore profileStore)
     {
+        _config = config;
         _enableCustomTiming = enableCustomTiming;
         _dayDurationSeconds = dayDurationSeconds;
         _daysBeforeQuota = daysBeforeQuota;
@@ -49,6 +52,8 @@ public sealed class ActiveSettings
     /// Access this from other components to persist or enumerate profiles.
     /// </summary>
     public ProfileStore Profiles => _profileStore;
+
+    public string ActiveProfileName => _activeProfileName.Value?.Trim() ?? string.Empty;
 
     public static ActiveSettings Bind(ConfigFile config)
     {
@@ -101,6 +106,7 @@ public sealed class ActiveSettings
         var profileStore = new ProfileStore(configDir);
 
         return new ActiveSettings(
+            config,
             enableCustomTiming,
             dayDurationSeconds,
             daysBeforeQuota,
@@ -109,6 +115,21 @@ public sealed class ActiveSettings
             quotaMultipliersCsv,
             activeProfileName,
             profileStore);
+    }
+
+    public void SetManualOverrides(TimingProfile profile)
+    {
+        _enableCustomTiming.Value = true;
+        _activeProfileName.Value = string.Empty;
+        _dayDurationSeconds.Value = profile.DayDurationSeconds;
+        _daysBeforeQuota.Value = profile.DaysBeforeQuota;
+        _startingQuota.Value = profile.StartingQuota;
+        _catchUpFactor.Value = profile.CatchUpFactor;
+        _quotaMultipliersCsv.Value = string.Join(
+            ",",
+            profile.QuotaMultipliers.Select(multiplier => multiplier.ToString(CultureInfo.InvariantCulture)));
+
+        _config.Save();
     }
 
     public bool TryCreateResolvedProfile(

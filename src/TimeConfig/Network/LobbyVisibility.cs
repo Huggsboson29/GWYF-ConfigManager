@@ -1,5 +1,7 @@
+using System;
 using BepInEx.Logging;
 using Mirror;
+using TimeConfig.Models;
 using TimeConfig.Runtime;
 
 namespace TimeConfig.Network;
@@ -11,8 +13,26 @@ namespace TimeConfig.Network;
 public static class LobbyVisibility
 {
     private static ManualLogSource? _log;
+    private static SessionTimingState? _clientState;
 
     public static void Initialize(ManualLogSource log) => _log = log;
+
+    public static SessionTimingState? GetVisibleState()
+    {
+        if (NetworkServer.active)
+        {
+            return TimingCoordinator.CurrentState;
+        }
+
+        if (NetworkClient.active)
+        {
+            return _clientState;
+        }
+
+        return TimingCoordinator.CurrentState;
+    }
+
+    public static void ClearClientState() => _clientState = null;
 
     /// <summary>
     /// Must be called from <c>PluginMain.Awake</c> before any network activity.
@@ -92,6 +112,17 @@ public static class LobbyVisibility
     {
         // Host already knows its own config; only log on pure clients.
         if (NetworkServer.activeHost) return;
+
+        _clientState = new SessionTimingState(
+            "TimingConfigMessage",
+            string.IsNullOrWhiteSpace(msg.ProfileName) ? "Vanilla" : msg.ProfileName,
+            msg.IsVanilla,
+            msg.DayDurationSeconds,
+            msg.DaysBeforeQuota,
+            msg.StartingQuota,
+            msg.CatchUpFactor,
+            msg.QuotaMultiplierCount,
+            DateTimeOffset.UtcNow);
 
         if (msg.IsVanilla)
         {
