@@ -10,10 +10,10 @@
 
 ## Release prerequisites
 
-- `src/TimeConfig/Packaging/manifest.json` must have the correct `version_number`, dependency list, and optional website URL.
-- `src/TimeConfig/Packaging/README.md` should describe install, config, and known limits.
-- `src/TimeConfig/Packaging/CHANGELOG.md` should include the release notes for the version you are publishing.
-- `src/TimeConfig/Packaging/icon.png` must exist and be a 256x256 PNG.
+- `src/ConfigManager/Packaging/manifest.json` must have the correct `version_number`, dependency list, and optional website URL.
+- `src/ConfigManager/Packaging/README.md` should describe install, config, and known limits.
+- `src/ConfigManager/Packaging/CHANGELOG.md` should include the release notes for the version you are publishing.
+- `src/ConfigManager/Packaging/icon.png` must exist and be a 256x256 PNG.
 
 ## Build a zip for Thunderstore
 
@@ -27,8 +27,8 @@ That script:
 
 1. Runs the test project unless `-SkipTests` is passed.
 2. Builds the plugin in Release.
-3. Stages `manifest.json`, `README.md`, `CHANGELOG.md`, `icon.png`, and `plugins/TimeConfig/TimeConfig.dll`.
-4. Produces `artifacts/thunderstore/TimeConfig-<version>.zip`.
+3. Stages `manifest.json`, `README.md`, `CHANGELOG.md`, `icon.png`, and `plugins/ConfigManager/ConfigManager.dll`.
+4. Produces `artifacts/thunderstore/ConfigManager-<version>.zip`.
 
 ## Upload through the Thunderstore site
 

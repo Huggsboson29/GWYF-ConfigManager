@@ -3,9 +3,9 @@ schemaVersion = "0.0.1"
 
 [package]
 namespace = "CHANGE_ME"
-name = "TimeConfig"
-versionNumber = "0.1.0"
-description = "Host-authoritative day length and quota pacing configuration for Gamble With Your Friends."
+name = "ConfigManager"
+versionNumber = "0.2.2"
+description = "Lets the lobby host change day length, starting quota, catch-up factor, and quota scaling from the lobby Settings tab."
 websiteUrl = ""
 containsNsfwContent = false
 
@@ -13,13 +13,13 @@ containsNsfwContent = false
 BepInEx-BepInExPack = "5.4.2305"
 
 [build]
-icon = "./src/TimeConfig/Packaging/icon.png"
-readme = "./src/TimeConfig/Packaging/README.md"
+icon = "./src/ConfigManager/Packaging/icon.png"
+readme = "./src/ConfigManager/Packaging/README.md"
 outdir = "./artifacts/thunderstore/tcli-build"
 
 [[build.copy]]
-source = "./src/TimeConfig/bin/Release/netstandard2.1/TimeConfig.dll"
-target = "plugins/TimeConfig/"
+source = "./src/ConfigManager/bin/Release/netstandard2.1/ConfigManager.dll"
+target = "plugins/ConfigManager/"
 
 [publish]
 repository = "https://thunderstore.io"

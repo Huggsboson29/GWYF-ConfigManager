@@ -68,13 +68,13 @@ function Write-ThunderstoreConfig {
     $content += @(
         '',
         '[build]',
-        'icon = "./src/TimeConfig/Packaging/icon.png"',
-        'readme = "./src/TimeConfig/Packaging/README.md"',
+        'icon = "./src/ConfigManager/Packaging/icon.png"',
+        'readme = "./src/ConfigManager/Packaging/README.md"',
         'outdir = "./artifacts/thunderstore/tcli-build"',
         '',
         '[[build.copy]]',
-        'source = "./src/TimeConfig/bin/Release/netstandard2.1/TimeConfig.dll"',
-        'target = "plugins/TimeConfig/"',
+        'source = "./src/ConfigManager/bin/Release/netstandard2.1/ConfigManager.dll"',
+        'target = "plugins/ConfigManager/"',
         '',
         '[publish]',
         'repository = "https://thunderstore.io"',
@@ -90,7 +90,7 @@ function Write-ThunderstoreConfig {
 $repoRoot = Split-Path $PSScriptRoot -Parent
 $generatedConfigDirectory = Join-Path $repoRoot 'artifacts\thunderstore'
 $configPath = Join-Path $generatedConfigDirectory 'thunderstore.publish.toml'
-$manifestPath = Join-Path $repoRoot 'src\TimeConfig\Packaging\manifest.json'
+$manifestPath = Join-Path $repoRoot 'src\ConfigManager\Packaging\manifest.json'
 $packScript = Join-Path $repoRoot 'scripts\Pack-Thunderstore.ps1'
 
 if (-not (Test-Path $manifestPath)) {

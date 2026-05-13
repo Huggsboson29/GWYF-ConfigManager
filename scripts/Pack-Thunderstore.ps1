@@ -10,14 +10,14 @@ param(
 $ErrorActionPreference = 'Stop'
 
 $repoRoot = Split-Path $PSScriptRoot -Parent
-$projectFile = Join-Path $repoRoot 'src\TimeConfig\TimeConfig.csproj'
-$testsProject = Join-Path $repoRoot 'tests\TimeConfig.Tests\TimeConfig.Tests.csproj'
-$manifestPath = Join-Path $repoRoot 'src\TimeConfig\Packaging\manifest.json'
-$readmePath = Join-Path $repoRoot 'src\TimeConfig\Packaging\README.md'
-$changelogPath = Join-Path $repoRoot 'src\TimeConfig\Packaging\CHANGELOG.md'
-$iconPath = Join-Path $repoRoot 'src\TimeConfig\Packaging\icon.png'
+$projectFile = Join-Path $repoRoot 'src\ConfigManager\ConfigManager.csproj'
+$testsProject = Join-Path $repoRoot 'tests\ConfigManager.Tests\ConfigManager.Tests.csproj'
+$manifestPath = Join-Path $repoRoot 'src\ConfigManager\Packaging\manifest.json'
+$readmePath = Join-Path $repoRoot 'src\ConfigManager\Packaging\README.md'
+$changelogPath = Join-Path $repoRoot 'src\ConfigManager\Packaging\CHANGELOG.md'
+$iconPath = Join-Path $repoRoot 'src\ConfigManager\Packaging\icon.png'
 $gameManagedDir = Join-Path $GameRoot 'Gamble With Your Friends_Data\Managed'
-$releaseDll = Join-Path $repoRoot 'src\TimeConfig\bin\Release\netstandard2.1\TimeConfig.dll'
+$releaseDll = Join-Path $repoRoot 'src\ConfigManager\bin\Release\netstandard2.1\ConfigManager.dll'
 
 if ([string]::IsNullOrWhiteSpace($OutputRoot)) {
     $OutputRoot = Join-Path $repoRoot 'artifacts\thunderstore'
@@ -57,7 +57,7 @@ if ([string]::IsNullOrWhiteSpace($packageName) -or [string]::IsNullOrWhiteSpace(
 
 $stagingDir = Join-Path $OutputRoot 'staging'
 $packageDir = Join-Path $stagingDir $packageName
-$pluginsDir = Join-Path $packageDir 'plugins\TimeConfig'
+$pluginsDir = Join-Path $packageDir 'plugins\ConfigManager'
 
 if (Test-Path $stagingDir) {
     Remove-Item -LiteralPath $stagingDir -Recurse -Force
@@ -69,11 +69,11 @@ Copy-Item -LiteralPath $manifestPath -Destination (Join-Path $packageDir 'manife
 Copy-Item -LiteralPath $readmePath -Destination (Join-Path $packageDir 'README.md') -Force
 Copy-Item -LiteralPath $changelogPath -Destination (Join-Path $packageDir 'CHANGELOG.md') -Force
 Copy-Item -LiteralPath $iconPath -Destination (Join-Path $packageDir 'icon.png') -Force
-Copy-Item -LiteralPath $releaseDll -Destination (Join-Path $pluginsDir 'TimeConfig.dll') -Force
+Copy-Item -LiteralPath $releaseDll -Destination (Join-Path $pluginsDir 'ConfigManager.dll') -Force
 
-$pdbPath = Join-Path $repoRoot 'src\TimeConfig\bin\Release\netstandard2.1\TimeConfig.pdb'
+$pdbPath = Join-Path $repoRoot 'src\ConfigManager\bin\Release\netstandard2.1\ConfigManager.pdb'
 if (Test-Path $pdbPath) {
-    Copy-Item -LiteralPath $pdbPath -Destination (Join-Path $pluginsDir 'TimeConfig.pdb') -Force
+    Copy-Item -LiteralPath $pdbPath -Destination (Join-Path $pluginsDir 'ConfigManager.pdb') -Force
 }
 
 New-Item -ItemType Directory -Path $OutputRoot -Force | Out-Null
