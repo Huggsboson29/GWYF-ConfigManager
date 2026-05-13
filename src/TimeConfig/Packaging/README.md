@@ -6,10 +6,16 @@ core time-pressure settings for new sessions.
 ## Current scope
 
 - Override day duration
-- Override days before quota
 - Override starting quota
 - Override quota catch-up factor
-- Override quota multipliers
+- Choose vanilla or custom-pattern quota scaling
+- Edit a bounded quota multiplier pattern from the native lobby settings menu
+
+## Notes
+
+- Multi-day quota timing overrides were removed after unstable in-game behavior.
+- Quota scaling still supports vanilla behavior or a custom multiplier pattern.
+- Custom settings are host-authoritative and visible through the lobby configuration flow.
 
 ## Development setup
 

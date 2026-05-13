@@ -15,6 +15,7 @@ public sealed class TimingProfileValidatorTests
             3,
             100L,
             0.75f,
+            QuotaScalingMode.CustomPattern,
             new[] { 1.2f, 1.3f, 1.5f });
 
         var outcomes = TimingProfileValidator.Validate(profile);
@@ -33,6 +34,7 @@ public sealed class TimingProfileValidatorTests
             3,
             100L,
             0.75f,
+            QuotaScalingMode.CustomPattern,
             new[] { 1.2f, 1.3f });
 
         var outcomes = TimingProfileValidator.Validate(profile);
@@ -55,5 +57,24 @@ public sealed class TimingProfileValidatorTests
         Assert.Empty(values);
         Assert.NotNull(error);
         Assert.Equal(ValidationStatus.Error, error!.Status);
+    }
+
+    [Fact]
+    public void Validate_AllowsVanillaScaling_WithoutCustomPattern()
+    {
+        var profile = new TimingProfile(
+            "VanillaScaling",
+            false,
+            300f,
+            3,
+            100L,
+            0.75f,
+            QuotaScalingMode.Vanilla,
+            Array.Empty<float>());
+
+        var outcomes = TimingProfileValidator.Validate(profile);
+
+        Assert.Contains(outcomes, outcome => outcome.Status == ValidationStatus.Valid);
+        Assert.DoesNotContain(outcomes, outcome => outcome.Status == ValidationStatus.Error);
     }
 }

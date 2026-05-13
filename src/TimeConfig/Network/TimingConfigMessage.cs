@@ -14,5 +14,6 @@ public struct TimingConfigMessage : NetworkMessage
     public int DaysBeforeQuota;
     public long StartingQuota;
     public float CatchUpFactor;
+    public int QuotaScalingModeValue;
     public int QuotaMultiplierCount;
 }

@@ -19,6 +19,7 @@ public sealed class ActiveSettings
     private readonly ConfigEntry<int> _daysBeforeQuota;
     private readonly ConfigEntry<long> _startingQuota;
     private readonly ConfigEntry<float> _catchUpFactor;
+    private readonly ConfigEntry<string> _quotaScalingMode;
     private readonly ConfigEntry<string> _quotaMultipliersCsv;
     private readonly ConfigEntry<string> _activeProfileName;
     private readonly ProfileStore _profileStore;
@@ -30,6 +31,7 @@ public sealed class ActiveSettings
         ConfigEntry<int> daysBeforeQuota,
         ConfigEntry<long> startingQuota,
         ConfigEntry<float> catchUpFactor,
+        ConfigEntry<string> quotaScalingMode,
         ConfigEntry<string> quotaMultipliersCsv,
         ConfigEntry<string> activeProfileName,
         ProfileStore profileStore)
@@ -40,6 +42,7 @@ public sealed class ActiveSettings
         _daysBeforeQuota = daysBeforeQuota;
         _startingQuota = startingQuota;
         _catchUpFactor = catchUpFactor;
+        _quotaScalingMode = quotaScalingMode;
         _quotaMultipliersCsv = quotaMultipliersCsv;
         _activeProfileName = activeProfileName;
         _profileStore = profileStore;
@@ -73,7 +76,7 @@ public sealed class ActiveSettings
             "Timing",
             "DaysBeforeQuota",
             PreserveInt,
-            "Override the number of days before the quota is due. Use -1 to preserve the loaded value.");
+            "Deprecated. Multi-day quota overrides are ignored; use -1 to preserve the loaded value.");
 
         var startingQuota = config.Bind(
             "Quota",
@@ -86,6 +89,12 @@ public sealed class ActiveSettings
             "CatchUpFactor",
             PreserveFloat,
             "Override the quota catch-up factor. Use -1 to preserve the loaded value.");
+
+        var quotaScalingMode = config.Bind(
+            "Quota",
+            "QuotaScalingMode",
+            string.Empty,
+            "Set the quota scaling mode to Vanilla or CustomPattern. Leave blank to keep legacy behavior based on whether a custom multiplier pattern is present.");
 
         var quotaMultipliersCsv = config.Bind(
             "Quota",
@@ -112,6 +121,7 @@ public sealed class ActiveSettings
             daysBeforeQuota,
             startingQuota,
             catchUpFactor,
+            quotaScalingMode,
             quotaMultipliersCsv,
             activeProfileName,
             profileStore);
@@ -122,18 +132,20 @@ public sealed class ActiveSettings
         _enableCustomTiming.Value = true;
         _activeProfileName.Value = string.Empty;
         _dayDurationSeconds.Value = profile.DayDurationSeconds;
-        _daysBeforeQuota.Value = profile.DaysBeforeQuota;
+        _daysBeforeQuota.Value = PreserveInt;
         _startingQuota.Value = profile.StartingQuota;
         _catchUpFactor.Value = profile.CatchUpFactor;
-        _quotaMultipliersCsv.Value = string.Join(
-            ",",
-            profile.QuotaMultipliers.Select(multiplier => multiplier.ToString(CultureInfo.InvariantCulture)));
+        _quotaScalingMode.Value = profile.QuotaScalingMode.ToString();
+        _quotaMultipliersCsv.Value = profile.QuotaScalingMode == QuotaScalingMode.CustomPattern
+            ? string.Join(",",
+                profile.QuotaMultipliers.Select(multiplier => multiplier.ToString(CultureInfo.InvariantCulture)))
+            : string.Empty;
 
         _config.Save();
     }
 
     public bool TryCreateResolvedProfile(
-        GameSettings baseSettings,
+        TimingProfile baseProfile,
         out TimingProfile profile,
         out IReadOnlyList<ValidationOutcome> outcomes)
     {
@@ -147,34 +159,42 @@ public sealed class ActiveSettings
 
         var resolvedDayDuration = ResolveFloat(
             stored?.DayDurationSeconds ?? _dayDurationSeconds.Value,
-            baseSettings.dayDuration);
+            baseProfile.DayDurationSeconds);
 
-        var resolvedDaysBeforeQuota = ResolveInt(
-            stored?.DaysBeforeQuota ?? _daysBeforeQuota.Value,
-            baseSettings.daysBeforeQuota);
+        var resolvedDaysBeforeQuota = baseProfile.DaysBeforeQuota;
 
         var resolvedStartingQuota = ResolveLong(
             stored?.StartingQuota ?? _startingQuota.Value,
-            baseSettings.startingQuota);
+            baseProfile.StartingQuota);
 
         var resolvedCatchUpFactor = ResolveFloat(
             stored?.CatchUpFactor ?? _catchUpFactor.Value,
-            baseSettings.catchUpFactor);
+            baseProfile.CatchUpFactor);
 
-        var resolvedQuotaMultipliers = baseSettings.quotas ?? new float[0];
-        if (stored?.QuotaMultipliers is { Length: > 0 } storedMultipliers)
+        var rawMultipliers = _quotaMultipliersCsv.Value?.Trim() ?? string.Empty;
+        var resolvedQuotaScalingMode = ResolveQuotaScalingMode(
+            stored?.QuotaScalingMode,
+            _quotaScalingMode.Value,
+            stored?.QuotaMultipliers,
+            rawMultipliers);
+
+        var resolvedQuotaMultipliers = baseProfile.QuotaMultipliers.ToArray();
+        if (resolvedQuotaScalingMode == QuotaScalingMode.CustomPattern && stored?.QuotaMultipliers is { Length: > 0 } storedMultipliers)
         {
             resolvedQuotaMultipliers = storedMultipliers;
         }
-        else
+        else if (resolvedQuotaScalingMode == QuotaScalingMode.CustomPattern)
         {
-            var rawMultipliers = _quotaMultipliersCsv.Value?.Trim() ?? string.Empty;
             if (!string.IsNullOrWhiteSpace(rawMultipliers))
             {
                 if (TimingProfileValidator.TryParseQuotaMultipliers(rawMultipliers, out var parsed, out var parseError))
                     resolvedQuotaMultipliers = parsed;
                 else if (parseError is not null)
                     validation.Add(parseError);
+            }
+            else
+            {
+                resolvedQuotaMultipliers = new float[0];
             }
         }
 
@@ -186,6 +206,7 @@ public sealed class ActiveSettings
             resolvedDaysBeforeQuota,
             resolvedStartingQuota,
             resolvedCatchUpFactor,
+            resolvedQuotaScalingMode,
             resolvedQuotaMultipliers.ToArray());
 
         validation.AddRange(TimingProfileValidator.Validate(profile));
@@ -202,4 +223,24 @@ public sealed class ActiveSettings
 
     private static long ResolveLong(long value, long vanilla) =>
         value > PreserveLong ? value : vanilla;
+
+    private static QuotaScalingMode ResolveQuotaScalingMode(
+        QuotaScalingMode? storedMode,
+        string configuredMode,
+        float[]? storedMultipliers,
+        string rawMultipliers)
+    {
+        if (storedMode.HasValue)
+        {
+            return storedMode.Value;
+        }
+
+        if (QuotaScalingModeParser.TryParse(configuredMode, out var parsedMode))
+        {
+            return parsedMode;
+        }
+
+        var hasCustomPattern = (storedMultipliers?.Length ?? 0) > 0 || !string.IsNullOrWhiteSpace(rawMultipliers);
+        return hasCustomPattern ? QuotaScalingMode.CustomPattern : QuotaScalingMode.Vanilla;
+    }
 }
