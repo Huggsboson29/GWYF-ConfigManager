@@ -12,6 +12,7 @@ public sealed class SessionTimingState
         int daysBeforeQuota,
         long startingQuota,
         float catchUpFactor,
+        QuotaScalingMode quotaScalingMode,
         int quotaMultiplierCount,
         DateTimeOffset appliedAtUtc)
     {
@@ -22,6 +23,7 @@ public sealed class SessionTimingState
         DaysBeforeQuota = daysBeforeQuota;
         StartingQuota = startingQuota;
         CatchUpFactor = catchUpFactor;
+        QuotaScalingMode = quotaScalingMode;
         QuotaMultiplierCount = quotaMultiplierCount;
         AppliedAtUtc = appliedAtUtc;
     }
@@ -39,6 +41,8 @@ public sealed class SessionTimingState
     public long StartingQuota { get; }
 
     public float CatchUpFactor { get; }
+
+    public QuotaScalingMode QuotaScalingMode { get; }
 
     public int QuotaMultiplierCount { get; }
 

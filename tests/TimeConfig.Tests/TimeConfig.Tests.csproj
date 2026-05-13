@@ -20,4 +20,11 @@
   <ItemGroup>
     <ProjectReference Include="..\..\src\TimeConfig\TimeConfig.csproj" />
   </ItemGroup>
+
+  <ItemGroup>
+    <Reference Include="BepInEx">
+      <HintPath>$(MSBuildThisFileDirectory)..\..\.local\BepInEx\extract\BepInEx\core\BepInEx.dll</HintPath>
+      <Private>true</Private>
+    </Reference>
+  </ItemGroup>
 </Project>

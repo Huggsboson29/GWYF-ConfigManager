@@ -35,8 +35,12 @@ public static class TimingCoordinator
     private static readonly System.Reflection.PropertyInfo? NetworkDaysPassedProperty =
         AccessTools.Property(typeof(GameManager), "NetworkdaysPassed");
 
+    private static readonly System.Reflection.PropertyInfo? NetworkSuccessfulQuotaProperty =
+        AccessTools.Property(typeof(GameManager), "NetworksuccessfulQuota");
+
     private static ActiveSettings? _settings;
     private static ManualLogSource? _log;
+    private static TimingProfile? _vanillaProfile;
 
     public static SessionTimingState? CurrentState { get; private set; }
 
@@ -44,6 +48,8 @@ public static class TimingCoordinator
     {
         _settings = settings;
         _log = log;
+        _vanillaProfile = null;
+        CurrentState = null;
     }
 
     public static bool TryApplyFromResources(string context)
@@ -61,17 +67,20 @@ public static class TimingCoordinator
     public static bool TryApplyToGameSettings(GameSettings gameSettings, string context)
     {
         EnsureInitialized();
+        CaptureVanillaProfile(gameSettings);
 
         if (!_settings!.IsEnabled)
         {
+            var baseProfile = GetBaseProfile(gameSettings);
             CurrentState = BuildState(
-                "Vanilla",
-                true,
-                gameSettings.dayDuration,
-                gameSettings.daysBeforeQuota,
-                gameSettings.startingQuota,
-                gameSettings.catchUpFactor,
-                gameSettings.quotas?.Length ?? 0,
+                baseProfile.Name,
+                baseProfile.IsVanillaProfile,
+                baseProfile.DayDurationSeconds,
+                baseProfile.DaysBeforeQuota,
+                baseProfile.StartingQuota,
+                baseProfile.CatchUpFactor,
+                baseProfile.QuotaScalingMode,
+                baseProfile.QuotaMultipliers.Count,
                 context);
 
             return false;
@@ -107,7 +116,7 @@ public static class TimingCoordinator
             return false;
         }
 
-        ApplyInitialQuotaToSaveData(saveData, resolvedProfile!, context);
+        ApplyResolvedProfileToSaveData(saveData, resolvedProfile!, context, resetQuotaState: true);
 
         return true;
     }
@@ -124,14 +133,7 @@ public static class TimingCoordinator
 
         if (!_settings!.IsEnabled)
         {
-            profile = new TimingProfile(
-                "Vanilla",
-                true,
-                gameSettings!.dayDuration,
-                gameSettings.daysBeforeQuota,
-                gameSettings.startingQuota,
-                gameSettings.catchUpFactor,
-                (gameSettings.quotas ?? Array.Empty<float>()).ToArray());
+            profile = GetBaseProfile(gameSettings!);
 
             return true;
         }
@@ -140,7 +142,8 @@ public static class TimingCoordinator
     }
 
     public static bool TryApplyManualOverrides(
-        TimingProfile profile,
+        TimingProfile previousProfile,
+        TimingProfile updatedProfile,
         string context,
         out IReadOnlyList<ValidationOutcome> outcomes)
     {
@@ -156,7 +159,7 @@ public static class TimingCoordinator
             return false;
         }
 
-        var validation = TimingProfileValidator.Validate(profile);
+        var validation = TimingProfileValidator.Validate(updatedProfile);
         outcomes = validation;
         var errors = validation.Where(outcome => outcome.Status == ValidationStatus.Error).ToArray();
         if (errors.Length > 0)
@@ -169,13 +172,27 @@ public static class TimingCoordinator
             return false;
         }
 
-        _settings!.SetManualOverrides(profile);
-        ApplyResolvedProfileToGameSettings(gameSettings!, profile, context);
+        CaptureVanillaProfile(gameSettings!);
+
+        _settings!.SetManualOverrides(updatedProfile);
+        if (!_settings.TryCreateResolvedProfile(GetBaseProfile(gameSettings!), out var resolvedProfile, out var resolvedOutcomes))
+        {
+            outcomes = resolvedOutcomes;
+            foreach (var outcome in resolvedOutcomes.Where(outcome => outcome.Status == ValidationStatus.Error))
+            {
+                _log!.LogError($"[{context}] {outcome.TargetField}: {outcome.Message}");
+            }
+
+            return false;
+        }
+
+        outcomes = resolvedOutcomes;
+        ApplyResolvedProfileToGameSettings(gameSettings!, resolvedProfile, context);
 
         var gameManager = UnityEngine.Object.FindFirstObjectByType<GameManager>();
         if (gameManager != null)
         {
-            ApplyResolvedProfileToGameManager(gameManager, profile, context);
+            ApplyManualProfileToGameManager(gameManager, previousProfile, resolvedProfile, context);
         }
 
         var saveManager = UnityEngine.Object.FindFirstObjectByType<SaveManager>();
@@ -184,7 +201,7 @@ public static class TimingCoordinator
             var saveData = CurrentSaveDataRef(saveManager);
             if (saveData != null)
             {
-                ApplyInitialQuotaToSaveData(saveData, profile, context);
+                ApplyManualProfileToSaveData(saveData, previousProfile, resolvedProfile, context);
             }
         }
 
@@ -217,7 +234,8 @@ public static class TimingCoordinator
 
     private static bool TryResolveProfile(GameSettings gameSettings, string context, out TimingProfile? profile)
     {
-        if (!_settings!.TryCreateResolvedProfile(gameSettings, out var resolvedProfile, out var outcomes))
+        CaptureVanillaProfile(gameSettings);
+        if (!_settings!.TryCreateResolvedProfile(GetBaseProfile(gameSettings), out var resolvedProfile, out var outcomes))
         {
             foreach (var outcome in outcomes.Where(o => o.Status == ValidationStatus.Error))
             {
@@ -230,6 +248,38 @@ public static class TimingCoordinator
 
         profile = resolvedProfile;
         return true;
+    }
+
+    private static void CaptureVanillaProfile(GameSettings gameSettings)
+    {
+        if (_vanillaProfile != null || gameSettings == null)
+        {
+            return;
+        }
+
+        _vanillaProfile = new TimingProfile(
+            "Vanilla",
+            true,
+            gameSettings.dayDuration,
+            gameSettings.daysBeforeQuota,
+            gameSettings.startingQuota,
+            gameSettings.catchUpFactor,
+            QuotaScalingMode.Vanilla,
+            (gameSettings.quotas ?? Array.Empty<float>()).ToArray());
+    }
+
+    private static TimingProfile GetBaseProfile(GameSettings gameSettings)
+    {
+        CaptureVanillaProfile(gameSettings);
+        return _vanillaProfile ?? new TimingProfile(
+            "Vanilla",
+            true,
+            gameSettings.dayDuration,
+            gameSettings.daysBeforeQuota,
+            gameSettings.startingQuota,
+            gameSettings.catchUpFactor,
+            QuotaScalingMode.Vanilla,
+            (gameSettings.quotas ?? Array.Empty<float>()).ToArray());
     }
 
     private static bool TryGetActiveGameSettings(
@@ -264,7 +314,6 @@ public static class TimingCoordinator
     private static void ApplyResolvedProfileToGameSettings(GameSettings gameSettings, TimingProfile profile, string context)
     {
         gameSettings.dayDuration = profile.DayDurationSeconds;
-        gameSettings.daysBeforeQuota = profile.DaysBeforeQuota;
         gameSettings.startingQuota = profile.StartingQuota;
         gameSettings.catchUpFactor = profile.CatchUpFactor;
         gameSettings.quotas = profile.QuotaMultipliers.ToArray();
@@ -276,6 +325,7 @@ public static class TimingCoordinator
             profile.DaysBeforeQuota,
             profile.StartingQuota,
             profile.CatchUpFactor,
+            profile.QuotaScalingMode,
             profile.QuotaMultipliers.Count,
             context);
 
@@ -283,10 +333,15 @@ public static class TimingCoordinator
             $"[{context}] Applied timing profile '{profile.Name}' " +
             $"(dayDuration={profile.DayDurationSeconds}, daysBeforeQuota={profile.DaysBeforeQuota}, " +
             $"startingQuota={profile.StartingQuota}, catchUpFactor={profile.CatchUpFactor}, " +
+            $"quotaScalingMode={profile.QuotaScalingMode}, " +
             $"quotaMultipliers={profile.QuotaMultipliers.Count}).");
     }
 
-    private static void ApplyResolvedProfileToGameManager(GameManager gameManager, TimingProfile profile, string context)
+    private static void ApplyResolvedProfileToGameManager(
+        GameManager gameManager,
+        TimingProfile profile,
+        string context,
+        bool resetQuotaState = true)
     {
         if (!CanUpdatePreDayRuntimeState(gameManager))
         {
@@ -294,27 +349,93 @@ public static class TimingCoordinator
         }
 
         NetworkTimerProperty?.SetValue(gameManager, profile.DayDurationSeconds);
-        NetworkCurrentQuotaProperty?.SetValue(gameManager, profile.StartingQuota);
-        NetworkRequiredQuotaProperty?.SetValue(gameManager, profile.StartingQuota);
 
-        var daysPassed = NetworkDaysPassedProperty?.GetValue(gameManager) as int? ?? 0;
-        if (daysPassed == 0)
+        if (resetQuotaState)
         {
-            NetworkDaysLeftProperty?.SetValue(gameManager, profile.DaysBeforeQuota);
+            NetworkCurrentQuotaProperty?.SetValue(gameManager, profile.StartingQuota);
+            NetworkRequiredQuotaProperty?.SetValue(gameManager, profile.StartingQuota);
         }
 
         _log!.LogInfo(
             $"[{context}] Applied pre-day runtime state to GameManager " +
-            $"(timer={profile.DayDurationSeconds}, currentQuota={profile.StartingQuota}, requiredQuota={profile.StartingQuota}, daysBeforeQuota={profile.DaysBeforeQuota}).");
+            $"(timer={profile.DayDurationSeconds}, quotaReset={resetQuotaState}, " +
+            $"currentQuota={profile.StartingQuota}, requiredQuota={profile.StartingQuota}).");
     }
 
-    private static void ApplyInitialQuotaToSaveData(SaveData saveData, TimingProfile profile, string context)
+    private static void ApplyManualProfileToGameManager(
+        GameManager gameManager,
+        TimingProfile previousProfile,
+        TimingProfile updatedProfile,
+        string context)
     {
-        saveData.currentQuota = profile.StartingQuota;
-        saveData.requiredQuotaToNextFloor = profile.StartingQuota;
+        if (!CanUpdatePreDayRuntimeState(gameManager))
+        {
+            return;
+        }
+
+        NetworkTimerProperty?.SetValue(gameManager, updatedProfile.DayDurationSeconds);
+
+        var daysPassed = ReadIntProperty(NetworkDaysPassedProperty, gameManager);
+        var successfulQuota = ReadIntProperty(NetworkSuccessfulQuotaProperty, gameManager);
+
+        var shouldResetInitialQuota = QuotaRuntimeStatePlanner.ShouldResetInitialQuota(
+            previousProfile.StartingQuota,
+            ReadLongProperty(NetworkCurrentQuotaProperty, gameManager),
+            ReadLongProperty(NetworkRequiredQuotaProperty, gameManager),
+            daysPassed,
+            successfulQuota);
+
+        if (shouldResetInitialQuota)
+        {
+            NetworkCurrentQuotaProperty?.SetValue(gameManager, updatedProfile.StartingQuota);
+            NetworkRequiredQuotaProperty?.SetValue(gameManager, updatedProfile.StartingQuota);
+        }
 
         _log!.LogInfo(
-            $"[{context}] Applied initial quota {profile.StartingQuota} to the active save state.");
+            $"[{context}] Applied manual pre-day runtime state to GameManager " +
+            $"(timer={updatedProfile.DayDurationSeconds}, preservedQuota={!shouldResetInitialQuota}).");
+    }
+
+    private static void ApplyResolvedProfileToSaveData(
+        SaveData saveData,
+        TimingProfile profile,
+        string context,
+        bool resetQuotaState)
+    {
+        if (resetQuotaState)
+        {
+            saveData.currentQuota = profile.StartingQuota;
+            saveData.requiredQuotaToNextFloor = profile.StartingQuota;
+        }
+
+        _log!.LogInfo(
+            $"[{context}] Applied save timing state " +
+            $"(quotaReset={resetQuotaState}, currentQuota={saveData.currentQuota}, " +
+            $"requiredQuota={saveData.requiredQuotaToNextFloor}).");
+    }
+
+    private static void ApplyManualProfileToSaveData(
+        SaveData saveData,
+        TimingProfile previousProfile,
+        TimingProfile updatedProfile,
+        string context)
+    {
+        var shouldResetInitialQuota = QuotaRuntimeStatePlanner.ShouldResetInitialQuota(
+            previousProfile.StartingQuota,
+            saveData.currentQuota,
+            saveData.requiredQuotaToNextFloor,
+            saveData.daysPassed,
+            saveData.successfulQuota);
+
+        if (shouldResetInitialQuota)
+        {
+            saveData.currentQuota = updatedProfile.StartingQuota;
+            saveData.requiredQuotaToNextFloor = updatedProfile.StartingQuota;
+        }
+
+        _log!.LogInfo(
+            $"[{context}] Updated active save state " +
+            $"(preservedQuota={!shouldResetInitialQuota}).");
     }
 
     private static bool CanUpdatePreDayRuntimeState(GameManager gameManager)
@@ -323,6 +444,22 @@ public static class TimingCoordinator
         return !hasDayStarted;
     }
 
+    private static int ReadIntProperty(System.Reflection.PropertyInfo? property, object instance) =>
+        property?.GetValue(instance) switch
+        {
+            int value => value,
+            long value => checked((int)value),
+            _ => 0,
+        };
+
+    private static long ReadLongProperty(System.Reflection.PropertyInfo? property, object instance) =>
+        property?.GetValue(instance) switch
+        {
+            long value => value,
+            int value => value,
+            _ => 0L,
+        };
+
     private static SessionTimingState BuildState(
         string profileName,
         bool isVanilla,
@@ -330,6 +467,7 @@ public static class TimingCoordinator
         int daysBeforeQuota,
         long startingQuota,
         float catchUpFactor,
+        QuotaScalingMode quotaScalingMode,
         int quotaMultiplierCount,
         string context)
     {
@@ -341,6 +479,7 @@ public static class TimingCoordinator
             daysBeforeQuota,
             startingQuota,
             catchUpFactor,
+            quotaScalingMode,
             quotaMultiplierCount,
             DateTimeOffset.UtcNow);
     }

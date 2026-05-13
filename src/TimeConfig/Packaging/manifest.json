@@ -1,8 +1,8 @@
 {
   "name": "TimeConfig",
-  "version_number": "0.1.0",
+  "version_number": "0.2.0",
   "website_url": "",
-  "description": "Host-authoritative day length and quota pacing configuration for Gamble With Your Friends.",
+  "description": "Host-authoritative day length and quota scaling configuration for Gamble With Your Friends.",
   "dependencies": [
     "BepInEx-BepInExPack-5.4.2305"
   ]

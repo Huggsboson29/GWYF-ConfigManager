@@ -48,6 +48,7 @@ public static class LobbyVisibility
             writer.WriteInt(msg.DaysBeforeQuota);
             writer.WriteLong(msg.StartingQuota);
             writer.WriteFloat(msg.CatchUpFactor);
+            writer.WriteInt(msg.QuotaScalingModeValue);
             writer.WriteInt(msg.QuotaMultiplierCount);
         };
 
@@ -59,6 +60,7 @@ public static class LobbyVisibility
             DaysBeforeQuota = reader.ReadInt(),
             StartingQuota = reader.ReadLong(),
             CatchUpFactor = reader.ReadFloat(),
+            QuotaScalingModeValue = reader.ReadInt(),
             QuotaMultiplierCount = reader.ReadInt(),
         };
 
@@ -105,6 +107,7 @@ public static class LobbyVisibility
             DaysBeforeQuota = state.DaysBeforeQuota,
             StartingQuota = state.StartingQuota,
             CatchUpFactor = state.CatchUpFactor,
+            QuotaScalingModeValue = (int)state.QuotaScalingMode,
             QuotaMultiplierCount = state.QuotaMultiplierCount,
         };
 
@@ -121,6 +124,7 @@ public static class LobbyVisibility
             msg.DaysBeforeQuota,
             msg.StartingQuota,
             msg.CatchUpFactor,
+            ResolveQuotaScalingMode(msg.QuotaScalingModeValue),
             msg.QuotaMultiplierCount,
             DateTimeOffset.UtcNow);
 
@@ -134,7 +138,13 @@ public static class LobbyVisibility
                 $"[LobbyVisibility] Host timing profile '{msg.ProfileName}': " +
                 $"dayDuration={msg.DayDurationSeconds}s, daysBeforeQuota={msg.DaysBeforeQuota}, " +
                 $"startingQuota={msg.StartingQuota}, catchUpFactor={msg.CatchUpFactor}, " +
+                $"quotaScalingMode={ResolveQuotaScalingMode(msg.QuotaScalingModeValue)}, " +
                 $"quotaMultiplierCount={msg.QuotaMultiplierCount}");
         }
     }
+
+    private static QuotaScalingMode ResolveQuotaScalingMode(int rawValue) =>
+        Enum.IsDefined(typeof(QuotaScalingMode), rawValue)
+            ? (QuotaScalingMode)rawValue
+            : QuotaScalingMode.Vanilla;
 }

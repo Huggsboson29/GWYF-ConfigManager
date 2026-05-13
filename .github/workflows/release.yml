@@ -156,6 +156,10 @@ jobs:
           }
           "game_root=$gameRoot" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
 
+      - name: Fetch BepInEx dependencies
+        shell: pwsh
+        run: .\scripts\Fetch-DevDependencies.ps1
+
       - name: Publish package to Thunderstore
         shell: pwsh
         run: |

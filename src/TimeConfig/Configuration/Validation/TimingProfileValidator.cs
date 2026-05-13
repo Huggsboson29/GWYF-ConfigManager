@@ -49,17 +49,20 @@ public static class TimingProfileValidator
                 $"Catch-up factor must be between {MinCatchUpFactor} and {MaxCatchUpFactor}."));
         }
 
-        if (profile.QuotaMultipliers.Count == 0)
+        if (profile.QuotaScalingMode == QuotaScalingMode.CustomPattern)
         {
-            outcomes.Add(ValidationOutcome.Error(
-                nameof(profile.QuotaMultipliers),
-                "At least one quota multiplier is required."));
-        }
-        else if (profile.QuotaMultipliers.Any(multiplier => multiplier < MinQuotaMultiplier || multiplier > MaxQuotaMultiplier))
-        {
-            outcomes.Add(ValidationOutcome.Error(
-                nameof(profile.QuotaMultipliers),
-                $"Each quota multiplier must be between {MinQuotaMultiplier} and {MaxQuotaMultiplier}."));
+            if (profile.QuotaMultipliers.Count == 0)
+            {
+                outcomes.Add(ValidationOutcome.Error(
+                    nameof(profile.QuotaMultipliers),
+                    "At least one quota multiplier is required when custom quota scaling is enabled."));
+            }
+            else if (profile.QuotaMultipliers.Any(multiplier => multiplier < MinQuotaMultiplier || multiplier > MaxQuotaMultiplier))
+            {
+                outcomes.Add(ValidationOutcome.Error(
+                    nameof(profile.QuotaMultipliers),
+                    $"Each quota multiplier must be between {MinQuotaMultiplier} and {MaxQuotaMultiplier}."));
+            }
         }
 
         if (outcomes.Count == 0)

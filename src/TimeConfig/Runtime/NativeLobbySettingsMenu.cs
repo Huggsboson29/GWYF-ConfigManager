@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using TimeConfig.Configuration;
 using TimeConfig.Models;
 using TimeConfig.Network;
 using UnityEngine;
@@ -9,11 +10,17 @@ namespace TimeConfig.Runtime;
 
 public static class NativeLobbySettingsMenu
 {
+    private const int MaxEditableQuotaMultipliers = 6;
+    private static readonly List<string> QuotaScalingModeOptions = new() { "Vanilla scaling", "Custom pattern" };
+
     public const string SectionKey = "timeconfig.section";
+    public const string TimeSectionKey = "timeconfig.time.section";
+    public const string QuotaSectionKey = "timeconfig.quota.section";
     public const string DayDurationMinutesKey = "timeconfig.day-duration-minutes";
-    public const string DaysBeforeQuotaKey = "timeconfig.days-before-quota";
     public const string StartingQuotaKey = "timeconfig.starting-quota";
     public const string CatchUpFactorKey = "timeconfig.catch-up-factor";
+    public const string QuotaScalingModeKey = "timeconfig.quota-scaling-mode";
+    public const string QuotaPatternLengthKey = "timeconfig.quota-pattern-length";
 
     private static SettingsLayout? _lobbySettingsLayout;
     private static bool _isSynchronizing;
@@ -59,7 +66,8 @@ public static class NativeLobbySettingsMenu
         tab.entries ??= new List<SettingItemBase>();
 
         var addedEntries = 0;
-        addedEntries += EnsureTitleEntry(tab.entries);
+        addedEntries += EnsureTitleEntry(tab.entries, SectionKey, "TimeConfig");
+        addedEntries += EnsureTitleEntry(tab.entries, TimeSectionKey, "Time");
         addedEntries += EnsureSliderEntry(
             tab.entries,
             DayDurationMinutesKey,
@@ -67,13 +75,7 @@ public static class NativeLobbySettingsMenu
             1f,
             1440f,
             wholeNumbers: true);
-        addedEntries += EnsureSliderEntry(
-            tab.entries,
-            DaysBeforeQuotaKey,
-            "Days before quota",
-            1f,
-            30f,
-            wholeNumbers: true);
+        addedEntries += EnsureTitleEntry(tab.entries, QuotaSectionKey, "Quota");
         addedEntries += EnsureSliderEntry(
             tab.entries,
             StartingQuotaKey,
@@ -88,6 +90,30 @@ public static class NativeLobbySettingsMenu
             0f,
             5f,
             wholeNumbers: false);
+        addedEntries += EnsureDropdownEntry(
+            tab.entries,
+            QuotaScalingModeKey,
+            "Quota scaling",
+            QuotaScalingModeOptions,
+            defaultIndex: (int)QuotaScalingMode.Vanilla);
+        addedEntries += EnsureSliderEntry(
+            tab.entries,
+            QuotaPatternLengthKey,
+            "Custom pattern length",
+            1f,
+            MaxEditableQuotaMultipliers,
+            wholeNumbers: true);
+
+        for (var index = 0; index < MaxEditableQuotaMultipliers; index++)
+        {
+            addedEntries += EnsureSliderEntry(
+                tab.entries,
+                GetQuotaMultiplierKey(index),
+                $"Pattern multiplier {index + 1}",
+                TimingProfileValidator.MinQuotaMultiplier,
+                TimingProfileValidator.MaxQuotaMultiplier,
+                wholeNumbers: false);
+        }
 
         SyncFromCurrentState();
 
@@ -115,25 +141,37 @@ public static class NativeLobbySettingsMenu
             return;
         }
 
-        var dayDurationEntry = FindEntry<SliderSettingItem>(_lobbySettingsLayout, DayDurationMinutesKey);
-        var daysBeforeQuotaEntry = FindEntry<SliderSettingItem>(_lobbySettingsLayout, DaysBeforeQuotaKey);
-        var startingQuotaEntry = FindEntry<SliderSettingItem>(_lobbySettingsLayout, StartingQuotaKey);
-        var catchUpFactorEntry = FindEntry<SliderSettingItem>(_lobbySettingsLayout, CatchUpFactorKey);
-        if (dayDurationEntry == null || daysBeforeQuotaEntry == null || startingQuotaEntry == null || catchUpFactorEntry == null)
+        if (!TryGetEditableEntries(
+                _lobbySettingsLayout,
+                out var dayDurationEntry,
+                out var startingQuotaEntry,
+                out var catchUpFactorEntry,
+                out var quotaScalingModeEntry,
+                out var quotaPatternLengthEntry,
+                out var quotaMultiplierEntries))
         {
             return;
         }
 
+        var quotaScalingMode = ResolveQuotaScalingMode(quotaScalingModeEntry!);
+        var customPattern = QuotaPatternEditor.BuildPattern(
+            quotaMultiplierEntries!
+                .Select(multiplierEntry => multiplierEntry.value)
+                .ToArray(),
+            Mathf.RoundToInt(quotaPatternLengthEntry!.value));
+
         var updatedProfile = new TimingProfile(
             "ActiveConfig",
             false,
-            dayDurationEntry.value * 60f,
-            Mathf.RoundToInt(daysBeforeQuotaEntry.value),
-            (long)Mathf.Round(startingQuotaEntry.value),
-            catchUpFactorEntry.value,
-            currentProfile.QuotaMultipliers);
+            dayDurationEntry!.value * 60f,
+            currentProfile.DaysBeforeQuota,
+            (long)Mathf.Round(startingQuotaEntry!.value),
+            catchUpFactorEntry!.value,
+            quotaScalingMode,
+            quotaScalingMode == QuotaScalingMode.CustomPattern ? customPattern : currentProfile.QuotaMultipliers);
 
         if (!TimingCoordinator.TryApplyManualOverrides(
+                currentProfile,
                 updatedProfile,
                 "NativeLobbySettingsMenu.NotifyChanged",
                 out _))
@@ -158,30 +196,50 @@ public static class NativeLobbySettingsMenu
             return;
         }
 
-        var dayDurationEntry = FindEntry<SliderSettingItem>(_lobbySettingsLayout, DayDurationMinutesKey);
-        var daysBeforeQuotaEntry = FindEntry<SliderSettingItem>(_lobbySettingsLayout, DaysBeforeQuotaKey);
-        var startingQuotaEntry = FindEntry<SliderSettingItem>(_lobbySettingsLayout, StartingQuotaKey);
-        var catchUpFactorEntry = FindEntry<SliderSettingItem>(_lobbySettingsLayout, CatchUpFactorKey);
-        if (dayDurationEntry == null || daysBeforeQuotaEntry == null || startingQuotaEntry == null || catchUpFactorEntry == null)
+        if (!TryGetEditableEntries(
+                _lobbySettingsLayout,
+                out var dayDurationEntry,
+                out var startingQuotaEntry,
+                out var catchUpFactorEntry,
+                out var quotaScalingModeEntry,
+                out var quotaPatternLengthEntry,
+                out var quotaMultiplierEntries))
         {
             return;
         }
 
+        var editablePattern = QuotaPatternEditor.BuildEditableValues(profile.QuotaMultipliers, MaxEditableQuotaMultipliers);
+
         _isSynchronizing = true;
         try
         {
-            dayDurationEntry.value = Mathf.Clamp(profile.DayDurationSeconds / 60f, dayDurationEntry.min, dayDurationEntry.max);
+            dayDurationEntry!.value = Mathf.Clamp(profile.DayDurationSeconds / 60f, dayDurationEntry.min, dayDurationEntry.max);
             dayDurationEntry.defaultValue = dayDurationEntry.value;
 
-            daysBeforeQuotaEntry.value = Mathf.Clamp(profile.DaysBeforeQuota, daysBeforeQuotaEntry.min, daysBeforeQuotaEntry.max);
-            daysBeforeQuotaEntry.defaultValue = daysBeforeQuotaEntry.value;
-
-            startingQuotaEntry.max = Mathf.Max(100000f, Mathf.Ceil((float)profile.StartingQuota / 5000f) * 5000f);
+            startingQuotaEntry!.max = Mathf.Max(100000f, Mathf.Ceil((float)profile.StartingQuota / 5000f) * 5000f);
             startingQuotaEntry.value = Mathf.Clamp((float)profile.StartingQuota, startingQuotaEntry.min, startingQuotaEntry.max);
             startingQuotaEntry.defaultValue = startingQuotaEntry.value;
 
-            catchUpFactorEntry.value = Mathf.Clamp(profile.CatchUpFactor, catchUpFactorEntry.min, catchUpFactorEntry.max);
+            catchUpFactorEntry!.value = Mathf.Clamp(profile.CatchUpFactor, catchUpFactorEntry.min, catchUpFactorEntry.max);
             catchUpFactorEntry.defaultValue = catchUpFactorEntry.value;
+
+            quotaScalingModeEntry!.index = Mathf.Clamp((int)profile.QuotaScalingMode, 0, QuotaScalingModeOptions.Count - 1);
+
+            quotaPatternLengthEntry!.value = Mathf.Clamp(
+                Mathf.Max(1, Mathf.Min(profile.QuotaMultipliers.Count, MaxEditableQuotaMultipliers)),
+                quotaPatternLengthEntry.min,
+                quotaPatternLengthEntry.max);
+            quotaPatternLengthEntry.defaultValue = quotaPatternLengthEntry.value;
+
+            for (var index = 0; index < quotaMultiplierEntries!.Length; index++)
+            {
+                var multiplierEntry = quotaMultiplierEntries[index];
+                multiplierEntry.max = Mathf.Max(
+                    TimingProfileValidator.MaxQuotaMultiplier,
+                    Mathf.Ceil(editablePattern[index]));
+                multiplierEntry.value = Mathf.Clamp(editablePattern[index], multiplierEntry.min, multiplierEntry.max);
+                multiplierEntry.defaultValue = multiplierEntry.value;
+            }
         }
         finally
         {
@@ -201,9 +259,11 @@ public static class NativeLobbySettingsMenu
 
     private static bool IsTimeConfigKey(string? key) =>
         key == DayDurationMinutesKey ||
-        key == DaysBeforeQuotaKey ||
         key == StartingQuotaKey ||
-        key == CatchUpFactorKey;
+        key == CatchUpFactorKey ||
+        key == QuotaScalingModeKey ||
+        key == QuotaPatternLengthKey ||
+        IsQuotaMultiplierKey(key);
 
     private static bool IsLobbySettingsLayout(SettingsLayout layout) =>
         FindTargetTab(layout) != null;
@@ -247,18 +307,41 @@ public static class NativeLobbySettingsMenu
         return string.Equals(entry.label?.Trim(), "Lobby Mode", StringComparison.OrdinalIgnoreCase);
     }
 
-    private static int EnsureTitleEntry(ICollection<SettingItemBase> entries)
+    private static int EnsureTitleEntry(ICollection<SettingItemBase> entries, string key, string label)
     {
-        if (entries.Any(entry => entry.key == SectionKey))
+        if (entries.Any(entry => entry.key == key))
         {
             return 0;
         }
 
         var titleEntry = ScriptableObject.CreateInstance<TitleSettingItem>();
         titleEntry.hideFlags = HideFlags.HideAndDontSave;
-        titleEntry.key = SectionKey;
-        titleEntry.label = "TimeConfig";
+        titleEntry.key = key;
+        titleEntry.label = label;
         entries.Add(titleEntry);
+        return 1;
+    }
+
+    private static int EnsureDropdownEntry(
+        ICollection<SettingItemBase> entries,
+        string key,
+        string label,
+        IReadOnlyCollection<string> options,
+        int defaultIndex)
+    {
+        if (entries.Any(entry => entry.key == key))
+        {
+            return 0;
+        }
+
+        var dropdownEntry = ScriptableObject.CreateInstance<DropdownSettingItem>();
+        dropdownEntry.hideFlags = HideFlags.HideAndDontSave;
+        dropdownEntry.key = key;
+        dropdownEntry.label = label;
+        dropdownEntry.options = options.ToList();
+        dropdownEntry.index = Mathf.Clamp(defaultIndex, 0, dropdownEntry.options.Count - 1);
+        dropdownEntry.loadOnSceneStart = false;
+        entries.Add(dropdownEntry);
         return 1;
     }
 
@@ -308,4 +391,57 @@ public static class NativeLobbySettingsMenu
 
         return null;
     }
+
+    private static bool TryGetEditableEntries(
+        SettingsLayout layout,
+        out SliderSettingItem? dayDurationEntry,
+        out SliderSettingItem? startingQuotaEntry,
+        out SliderSettingItem? catchUpFactorEntry,
+        out DropdownSettingItem? quotaScalingModeEntry,
+        out SliderSettingItem? quotaPatternLengthEntry,
+        out SliderSettingItem[]? quotaMultiplierEntries)
+    {
+        dayDurationEntry = FindEntry<SliderSettingItem>(layout, DayDurationMinutesKey);
+        startingQuotaEntry = FindEntry<SliderSettingItem>(layout, StartingQuotaKey);
+        catchUpFactorEntry = FindEntry<SliderSettingItem>(layout, CatchUpFactorKey);
+        quotaScalingModeEntry = FindEntry<DropdownSettingItem>(layout, QuotaScalingModeKey);
+        quotaPatternLengthEntry = FindEntry<SliderSettingItem>(layout, QuotaPatternLengthKey);
+        quotaMultiplierEntries = GetQuotaMultiplierEntries(layout);
+
+        return dayDurationEntry != null
+            && startingQuotaEntry != null
+            && catchUpFactorEntry != null
+            && quotaScalingModeEntry != null
+            && quotaPatternLengthEntry != null
+            && quotaMultiplierEntries.Length == MaxEditableQuotaMultipliers;
+    }
+
+    private static SliderSettingItem[] GetQuotaMultiplierEntries(SettingsLayout layout)
+    {
+        var entries = new SliderSettingItem[MaxEditableQuotaMultipliers];
+        for (var index = 0; index < MaxEditableQuotaMultipliers; index++)
+        {
+            var entry = FindEntry<SliderSettingItem>(layout, GetQuotaMultiplierKey(index));
+            if (entry == null)
+            {
+                return Array.Empty<SliderSettingItem>();
+            }
+
+            entries[index] = entry;
+        }
+
+        return entries;
+    }
+
+    private static QuotaScalingMode ResolveQuotaScalingMode(DropdownSettingItem entry) =>
+        entry.index == (int)QuotaScalingMode.CustomPattern
+            ? QuotaScalingMode.CustomPattern
+            : QuotaScalingMode.Vanilla;
+
+    private static string GetQuotaMultiplierKey(int index) =>
+        $"timeconfig.quota-multiplier-{index + 1}";
+
+    private static bool IsQuotaMultiplierKey(string? key) =>
+        !string.IsNullOrWhiteSpace(key) &&
+        key.StartsWith("timeconfig.quota-multiplier-", StringComparison.OrdinalIgnoreCase);
 }
