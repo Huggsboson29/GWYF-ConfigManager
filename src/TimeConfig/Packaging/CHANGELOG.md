@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.2.1
+
+- Retitle the Thunderstore package to ConfigManager
+- Replace the package summary and README with player-facing usage instructions
+- Clarify that settings live under the lobby Settings tab in the ConfigManager section
+
 ## 0.2.0
 
 - Add host-side quota scaling controls with vanilla or custom-pattern growth modes

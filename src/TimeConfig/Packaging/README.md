@@ -1,38 +1,31 @@
 # ConfigManager
 
-ConfigManager is a BepInEx plugin for *Gamble With Your Friends* that lets the host override
-core time-pressure settings for new sessions.
+ConfigManager lets the lobby host tune the run's time pressure without editing config files.
+It adds a host-only section to the lobby settings so you can change how long a day lasts
+and how the quota ramps before the run starts.
 
-## Current scope
+## Where to find it
 
-- Override day duration
-- Override starting quota
-- Override quota catch-up factor
-- Choose vanilla or custom-pattern quota scaling
-- Edit a bounded quota multiplier pattern from the native lobby settings menu
+1. Host a multiplayer lobby.
+2. Open the lobby `Settings` tab.
+3. Scroll to the `ConfigManager` section.
+4. Change the values before starting the run.
 
-## Notes
+## What you can change
 
-- Multi-day quota timing overrides were removed after unstable in-game behavior.
-- Quota scaling still supports vanilla behavior or a custom multiplier pattern.
-- Custom settings are host-authoritative and visible through the lobby configuration flow.
+- Day duration in minutes
+- Starting quota
+- Catch-up factor
+- Quota scaling mode: vanilla scaling or custom pattern
+- Custom pattern length and each pattern multiplier when custom scaling is enabled
 
-## Development setup
+## How it behaves
 
-1. Run `scripts\Fetch-DevDependencies.ps1`
-2. Build `src\TimeConfig\TimeConfig.csproj`
-3. Copy the built `TimeConfig.dll` into your BepInEx plugins folder
+- Only the lobby host can change ConfigManager settings.
+- The active host settings apply to everyone in that lobby.
+- Players joining the lobby see the host-selected configuration through the normal lobby flow.
+- Quota timing still follows the base game's normal cadence; multi-day quota overrides are not included.
 
-For local runtime testing on a standard Steam install, run `scripts\Deploy-ToGame.ps1` to
-install BepInEx if needed, build the plugin, and copy it into the game's plugins folder.
+## Requirement
 
-For a Thunderstore-ready release zip, add `src\TimeConfig\Packaging\icon.png` and run
-`scripts\Pack-Thunderstore.ps1`.
-
-For CLI publishing, set your Thunderstore team name and API token, then run
-`scripts\Publish-Thunderstore.ps1 -Namespace <team>`.
-
-## Runtime config
-
-The plugin creates a BepInEx config file with vanilla-safe defaults. Enable custom timing
-explicitly before changing any override values.
+ConfigManager requires BepInEx, which Thunderstore will install automatically as a dependency.

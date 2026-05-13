@@ -12,7 +12,7 @@ public sealed class PluginMain : BaseUnityPlugin
 {
     public const string PluginGuid = "com.lncinteractive";
     public const string PluginName = "ConfigManager";
-    public const string PluginVersion = "0.2.0";
+    public const string PluginVersion = "0.2.1";
 
     internal static ManualLogSource Log { get; private set; } = null!;
 
