@@ -4,7 +4,7 @@ schemaVersion = "0.0.1"
 [package]
 namespace = "CHANGE_ME"
 name = "ConfigManager"
-versionNumber = "0.2.2"
+versionNumber = "0.2.3"
 description = "Lets the lobby host change day length, starting quota, catch-up factor, and quota scaling from the lobby Settings tab."
 websiteUrl = ""
 containsNsfwContent = false

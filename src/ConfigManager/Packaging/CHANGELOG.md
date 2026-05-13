@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.2.3
+
+- No gameplay changes; repackaged the Thunderstore upload for a clean resubmission review
+
 ## 0.2.2
 
 - Finish the TimeConfig to ConfigManager rename across the repo, packaging, and release workflow

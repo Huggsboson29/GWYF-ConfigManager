@@ -71,11 +71,6 @@ Copy-Item -LiteralPath $changelogPath -Destination (Join-Path $packageDir 'CHANG
 Copy-Item -LiteralPath $iconPath -Destination (Join-Path $packageDir 'icon.png') -Force
 Copy-Item -LiteralPath $releaseDll -Destination (Join-Path $pluginsDir 'ConfigManager.dll') -Force
 
-$pdbPath = Join-Path $repoRoot 'src\ConfigManager\bin\Release\netstandard2.1\ConfigManager.pdb'
-if (Test-Path $pdbPath) {
-    Copy-Item -LiteralPath $pdbPath -Destination (Join-Path $pluginsDir 'ConfigManager.pdb') -Force
-}
-
 New-Item -ItemType Directory -Path $OutputRoot -Force | Out-Null
 
 $zipPath = Join-Path $OutputRoot ("{0}-{1}.zip" -f $packageName, $packageVersion)
